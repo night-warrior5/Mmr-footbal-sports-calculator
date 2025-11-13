@@ -36,7 +36,7 @@ DEFAULT_K = 40.0
 HOME_ADVANTAGE = 60.0
 SEASON_BLEND = 0.5
 PROMOTION_BONUS = 75.0
-RELEGATION_NERF = 75.0  # positive magnitude
+RELEGATION_NERF = 75.0 
 
 
 # Helpers Key words[Definations, Divisons, Tier Sorting]
@@ -50,7 +50,6 @@ def get_tier_from_div(div: str) -> int:
     if digits:
         try:
             tier_num = int(digits)
-            # clamp reasonable tiers [1..5]
             return max(1, min(5, tier_num if tier_num >= 1 else 1))
         except ValueError:
             pass
@@ -107,7 +106,7 @@ def parse_dates_robust(series: pd.Series) -> pd.Series:
         parsed2 = pd.to_datetime(s[mask], errors="coerce", dayfirst=False)
         parsed.loc[mask] = parsed2
 
-    # Final attempt per-cell with a small set of formats
+    # Final attempt per-cell
     def try_manual(x: str):
         from datetime import datetime
         fmts = [
@@ -174,19 +173,15 @@ def process_matches(
             st.mmr = (1 - season_blend) * st.mmr + season_blend * base
             # If tier changed vs last season, apply promo/relegation adjustment
             if st.last_tier is not None and tier != st.last_tier:
-                # smaller tier number -> promotion
                 if tier < st.last_tier:
-                    # promotion: nudge further toward new base
                     direction = 1.0 if (base - st.mmr) >= 0 else -1.0
                     st.mmr += direction * promotion_bonus
                 else:
-                    # relegation: nudge away from previous base toward lower tier base (penalty)
                     direction = 1.0 if (base - st.mmr) >= 0 else -1.0
                     st.mmr -= direction * relegation_nerf
             st.last_season = season
             st.last_tier = tier
         else:
-            # same season; update tier if changed in-season (rare)
             st.last_tier = tier
 
     for _, row in df.iterrows():
@@ -222,7 +217,7 @@ def process_matches(
 
         gdf = goal_diff_factor(home_before, away_before, gd_abs)
         delta_home = k * gdf * (actual_home - exp_home)
-        delta_away = -delta_home  # keep it symmetric
+        delta_away = -delta_home  
 
         home_after = home_before + delta_home
         away_after = away_before + delta_away
