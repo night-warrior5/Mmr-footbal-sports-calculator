@@ -109,8 +109,3 @@ Optional flags:
 
 ## Example
 We include an example run using the uploaded dataset `E0 - 1993-2010 (1).csv`, producing an output file like `mmr_output_E0_1993-2010.csv`.
-
----
-
-## License
-MIT
