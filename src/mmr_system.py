@@ -56,18 +56,35 @@ def get_tier_from_div(div: str) -> int:
             pass
     return 1
 
+
 def base_for_div(div: str) -> float:
     return TIER_BASE.get(get_tier_from_div(div), 1500.0)
+
 
 def compute_season_key(ts: pd.Timestamp) -> int:
     """European season start around July. Season key = starting year."""
     return ts.year if ts.month >= 7 else ts.year - 1
 
+
 def expected_home_score(home_mmr: float, away_mmr: float, home_advantage: float) -> float:
     return 1.0 / (1.0 + 10.0 ** ((away_mmr - (home_mmr + home_advantage)) / 400.0))
 
+
 def goal_diff_factor(home_mmr: float, away_mmr: float, goal_diff_abs: int) -> float:
-    return math.log10(goal_diff_abs + 1.0) * (2.2 / (((home_mmr - away_mmr) * 0.001) + 2.2))
+    """
+    Goal difference scaling for Elo-style updates.
+
+    Important: draws (goal_diff_abs == 0) should still move MMR, so we use 1.0
+    instead of 0 to avoid killing all rating change on draws.
+    """
+    if goal_diff_abs == 0:
+        # Draws: use normal K (no GD boost, but not zero either)
+        return 1.0
+
+    return math.log10(goal_diff_abs + 1.0) * (
+        2.2 / (((home_mmr - away_mmr) * 0.001) + 2.2)
+    )
+
 
 @dataclass
 class TeamState:
@@ -75,7 +92,9 @@ class TeamState:
     last_season: int = None
     last_tier: int = None
 
+
 # Idk bruh thb  Key words[Core, Divisons, Processing, Core Processing]
+
 
 def parse_dates_robust(series: pd.Series) -> pd.Series:
     """Try several date formats and coercions; drop invalid later."""
@@ -87,27 +106,38 @@ def parse_dates_robust(series: pd.Series) -> pd.Series:
     if mask.any():
         parsed2 = pd.to_datetime(s[mask], errors="coerce", dayfirst=False)
         parsed.loc[mask] = parsed2
+
     # Final attempt per-cell with a small set of formats
     def try_manual(x: str):
         from datetime import datetime
-        fmts = ["%d/%m/%Y","%d/%m/%y","%Y-%m-%d","%d-%m-%Y","%d-%m-%y","%m/%d/%Y","%m/%d/%y","%Y/%m/%d"]
+        fmts = [
+            "%d/%m/%Y", "%d/%m/%y",
+            "%Y-%m-%d",
+            "%d-%m-%Y", "%d-%m-%y",
+            "%m/%d/%Y", "%m/%d/%y",
+            "%Y/%m/%d",
+        ]
         for f in fmts:
             try:
                 return pd.Timestamp(datetime.strptime(x, f))
             except Exception:
                 continue
         return pd.NaT
+
     mask = parsed.isna()
     if mask.any():
         parsed.loc[mask] = s[mask].map(try_manual)
     return parsed
 
-def process_matches(df: pd.DataFrame,
-                    k: float = DEFAULT_K,
-                    home_adv: float = HOME_ADVANTAGE,
-                    season_blend: float = SEASON_BLEND,
-                    promotion_bonus: float = PROMOTION_BONUS,
-                    relegation_nerf: float = RELEGATION_NERF) -> pd.DataFrame:
+
+def process_matches(
+    df: pd.DataFrame,
+    k: float = DEFAULT_K,
+    home_adv: float = HOME_ADVANTAGE,
+    season_blend: float = SEASON_BLEND,
+    promotion_bonus: float = PROMOTION_BONUS,
+    relegation_nerf: float = RELEGATION_NERF,
+) -> pd.DataFrame:
     """
     Process matches in chronological order and return a per-match MMR log.
 
@@ -192,7 +222,7 @@ def process_matches(df: pd.DataFrame,
 
         gdf = goal_diff_factor(home_before, away_before, gd_abs)
         delta_home = k * gdf * (actual_home - exp_home)
-        delta_away = -delta_home
+        delta_away = -delta_home  # keep it symmetric
 
         home_after = home_before + delta_home
         away_after = away_before + delta_away
@@ -220,9 +250,9 @@ def process_matches(df: pd.DataFrame,
         })
 
     out_df = pd.DataFrame(rows, columns=[
-        "Date","Div","HomeTeam","AwayTeam","FTHG","FTAG",
-        "HomeTeamMMRBefore","AwayTeamMMRBefore","HomeTeamMMRAfter","AwayTeamMMRAfter",
-        "DeltaHome","DeltaAway","ExpectedHome","ExpectedAway","KUsed","GoalDiff"
+        "Date", "Div", "HomeTeam", "AwayTeam", "FTHG", "FTAG",
+        "HomeTeamMMRBefore", "AwayTeamMMRBefore", "HomeTeamMMRAfter", "AwayTeamMMRAfter",
+        "DeltaHome", "DeltaAway", "ExpectedHome", "ExpectedAway", "KUsed", "GoalDiff"
     ])
     return out_df
 
