@@ -4,12 +4,9 @@ import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict
-
 import pandas as pd
 
-# Config & Defaults
-
-
+# Config & Defaults  Key words[Config, Defaults, Settings]
 TIER_BASE: Dict[int, float] = {
     1: 1600.0,
     2: 1500.0,
@@ -20,15 +17,10 @@ TIER_BASE: Dict[int, float] = {
 
 # Key words[codes, Divisons, Tier mapping]
 DIV_TIER_MAP: Dict[str, int] = {
-    # England
     "E0": 1, "E1": 2, "E2": 3, "E3": 4, "E4": 5,
-    # Spain
     "SP1": 1, "SP2": 2,
-    # Italy
     "I1": 1, "I2": 2,
-    # Germany
     "D1": 1, "D2": 2,
-    # France
     "F1": 1, "F2": 2,
 }
 
@@ -36,54 +28,34 @@ DEFAULT_K = 40.0
 HOME_ADVANTAGE = 60.0
 SEASON_BLEND = 0.5
 PROMOTION_BONUS = 75.0
-RELEGATION_NERF = 75.0 
+RELEGATION_NERF = 75.0  # Key words[MMRAdjust, TierDrop, Nerf]
 
-
-# Helpers Key words[Definations, Divisons, Tier Sorting]
-
-
+# Helpers  Key words[Definations, Divisons, Tier Sorting]
 def get_tier_from_div(div: str) -> int:
-    """Return tier integer for a division code, falling back to digits if unknown."""
+    """Return tier integer for a division code; fallback to numeric guess."""
     if div in DIV_TIER_MAP:
         return DIV_TIER_MAP[div]
     digits = "".join([c for c in div if c.isdigit()])
     if digits:
         try:
             tier_num = int(digits)
-            return max(1, min(5, tier_num if tier_num >= 1 else 1))
+            return max(1, min(5, tier_num))
         except ValueError:
             pass
     return 1
 
-
 def base_for_div(div: str) -> float:
     return TIER_BASE.get(get_tier_from_div(div), 1500.0)
 
-
 def compute_season_key(ts: pd.Timestamp) -> int:
-    """European season start around July. Season key = starting year."""
+    """Season key using July cutoff. Key words[Season, EuropeanCalendar]"""
     return ts.year if ts.month >= 7 else ts.year - 1
 
-
-def expected_home_score(home_mmr: float, away_mmr: float, home_advantage: float) -> float:
-    return 1.0 / (1.0 + 10.0 ** ((away_mmr - (home_mmr + home_advantage)) / 400.0))
-
+def expected_home_score(home_mmr: float, away_mmr: float, home_adv: float) -> float:
+    return 1.0 / (1.0 + 10.0 ** ((away_mmr - (home_mmr + home_adv)) / 400.0))
 
 def goal_diff_factor(home_mmr: float, away_mmr: float, goal_diff_abs: int) -> float:
-    """
-    Goal difference scaling for Elo-style updates.
-
-    Important: draws (goal_diff_abs == 0) should still move MMR, so we use 1.0
-    instead of 0 to avoid killing all rating change on draws.
-    """
-    if goal_diff_abs == 0:
-        # Draws: use normal K (no GD boost, but not zero either)
-        return 1.0
-
-    return math.log10(goal_diff_abs + 1.0) * (
-        2.2 / (((home_mmr - away_mmr) * 0.001) + 2.2)
-    )
-
+    return math.log10(goal_diff_abs + 1.0) * (2.2 / (((home_mmr - away_mmr) * 0.001) + 2.2))
 
 @dataclass
 class TeamState:
@@ -91,30 +63,21 @@ class TeamState:
     last_season: int = None
     last_tier: int = None
 
-
-# Idk bruh thb  Key words[Core, Divisons, Processing, Core Processing]
-
-
+# Idk bruh  Key words[Dates, Parse, Cleaning]
 def parse_dates_robust(series: pd.Series) -> pd.Series:
-    """Try several date formats and coercions; drop invalid later."""
+    """Try several date formats; coerce invalid ones."""
     s = series.astype(str).str.strip().str.replace(".", "/", regex=False)
-    # Try vectorized to_datetime first
     parsed = pd.to_datetime(s, errors="coerce", dayfirst=True)
-    # Fill remaining with month-first trial
     mask = parsed.isna()
     if mask.any():
         parsed2 = pd.to_datetime(s[mask], errors="coerce", dayfirst=False)
         parsed.loc[mask] = parsed2
 
-    # Final attempt per-cell
     def try_manual(x: str):
         from datetime import datetime
         fmts = [
-            "%d/%m/%Y", "%d/%m/%y",
-            "%Y-%m-%d",
-            "%d-%m-%Y", "%d-%m-%y",
-            "%m/%d/%Y", "%m/%d/%y",
-            "%Y/%m/%d",
+            "%d/%m/%Y","%d/%m/%y","%Y-%m-%d","%d-%m-%Y","%d-%m-%y",
+            "%m/%d/%Y","%m/%d/%y","%Y/%m/%d"
         ]
         for f in fmts:
             try:
@@ -126,76 +89,84 @@ def parse_dates_robust(series: pd.Series) -> pd.Series:
     mask = parsed.isna()
     if mask.any():
         parsed.loc[mask] = s[mask].map(try_manual)
+
     return parsed
 
 
+# Core processing  Key words[Engine, Loop, MMR]
 def process_matches(
     df: pd.DataFrame,
     k: float = DEFAULT_K,
     home_adv: float = HOME_ADVANTAGE,
     season_blend: float = SEASON_BLEND,
     promotion_bonus: float = PROMOTION_BONUS,
-    relegation_nerf: float = RELEGATION_NERF,
+    relegation_nerf: float = RELEGATION_NERF
 ) -> pd.DataFrame:
-    """
-    Process matches in chronological order and return a per-match MMR log.
 
-    Required input columns: Date, Div, HomeTeam, AwayTeam, FTHG, FTAG
-    """
-    # Validate columns
+    # Validate input  Key words[InputCheck, RequiredColumns]
     required_cols = ["Date", "Div", "HomeTeam", "AwayTeam", "FTHG", "FTAG"]
     for c in required_cols:
         if c not in df.columns:
             raise ValueError(f"Input missing required column: {c}")
 
+    # Sorting & prep  Key words[Dates, Sorting, Chronological]
     df = df.copy()
     df["Date"] = parse_dates_robust(df["Date"])
-    before = len(df)
     df = df.dropna(subset=["Date"]).reset_index(drop=True)
-    if len(df) == 0:
-        raise ValueError("All rows had unparseable dates in 'Date' column.")
-
     df = df.sort_values("Date").reset_index(drop=True)
 
     teams: Dict[str, TeamState] = {}
     rows = []
 
+    # Season reset logic  Key words[SeasonReset, Blend, PromoReleg]
     def preseason_adjust(team: str, div: str, season: int):
         base = base_for_div(div)
         tier = get_tier_from_div(div)
-        # New team: initialize at division base
+
         if team not in teams:
+            # First appearance  Key words[Init, Spawn, BaseAssign]
             teams[team] = TeamState(mmr=base, last_season=season, last_tier=tier)
             return
+
         st = teams[team]
-        if st.last_season is None or st.last_season != season:
-            # Blend toward current division base
+
+        # Season changed → reset, blend, handle tier jump
+        if st.last_season != season:
             st.mmr = (1 - season_blend) * st.mmr + season_blend * base
-            # If tier changed vs last season, apply promo/relegation adjustment
+
+            # Promotion / relegation detection works now
             if st.last_tier is not None and tier != st.last_tier:
+                # Promotion  Key words[Promotion, TierUp, Buff]
                 if tier < st.last_tier:
-                    direction = 1.0 if (base - st.mmr) >= 0 else -1.0
+                    direction = 1 if (base - st.mmr) >= 0 else -1
                     st.mmr += direction * promotion_bonus
+                # Relegation  Key words[Relegation, TierDown, Debuff]
                 else:
-                    direction = 1.0 if (base - st.mmr) >= 0 else -1.0
-                    st.mmr -= direction * relegation_nerf
+                    direction = -1 if (st.mmr - base) >= 0 else 1
+                    st.mmr += direction * (-abs(relegation_nerf))
+
+            # Update saved season/tier AFTER logic
             st.last_season = season
             st.last_tier = tier
-        else:
-            st.last_tier = tier
 
+        else:
+            # Same season  Key words[NoReset, MaintainTier]
+            if st.last_tier != tier:
+                st.last_tier = tier
+
+    # Main match loop  Key words[Loop, MatchIter, MMRCalc]
     for _, row in df.iterrows():
         date = row["Date"]
         div = str(row["Div"]).strip()
         home = str(row["HomeTeam"]).strip()
         away = str(row["AwayTeam"]).strip()
-        # Goals as integers
+
         fthg = int(float(row["FTHG"])) if pd.notna(row["FTHG"]) else 0
         ftag = int(float(row["FTAG"])) if pd.notna(row["FTAG"]) else 0
 
         season = compute_season_key(pd.Timestamp(date))
 
-        # Preseason checks
+        # Seasonal updates
         preseason_adjust(home, div, season)
         preseason_adjust(away, div, season)
 
@@ -206,8 +177,9 @@ def process_matches(
         gd_abs = abs(goal_diff)
 
         exp_home = expected_home_score(home_before, away_before, home_adv)
-        exp_away = 1.0 - exp_home
+        exp_away = 1.0 - exp_home  # Key words[Expected, Model, Probabilities]
 
+        # Match result  Key words[Outcome, Result, WDL]
         if goal_diff > 0:
             actual_home = 1.0
         elif goal_diff == 0:
@@ -215,9 +187,10 @@ def process_matches(
         else:
             actual_home = 0.0
 
+        # K-factor / GD factor calc
         gdf = goal_diff_factor(home_before, away_before, gd_abs)
         delta_home = k * gdf * (actual_home - exp_home)
-        delta_away = -delta_home  
+        delta_away = -delta_home
 
         home_after = home_before + delta_home
         away_after = away_before + delta_away
@@ -244,18 +217,13 @@ def process_matches(
             "GoalDiff": int(goal_diff),
         })
 
-    out_df = pd.DataFrame(rows, columns=[
-        "Date", "Div", "HomeTeam", "AwayTeam", "FTHG", "FTAG",
-        "HomeTeamMMRBefore", "AwayTeamMMRBefore", "HomeTeamMMRAfter", "AwayTeamMMRAfter",
-        "DeltaHome", "DeltaAway", "ExpectedHome", "ExpectedAway", "KUsed", "GoalDiff"
-    ])
-    return out_df
+    return pd.DataFrame(rows)
 
-
+# CLI wrapper  Key words[CLI, Args, IO]
 def main():
     ap = argparse.ArgumentParser(description="MMR system for multi-league, multi-division football data.")
-    ap.add_argument("--input", required=True, help="CSV with columns: Date, Div, HomeTeam, AwayTeam, FTHG, FTAG")
-    ap.add_argument("--output", required=True, help="Output CSV path for per-match MMR rows")
+    ap.add_argument("--input", required=True)
+    ap.add_argument("--output", required=True)
     ap.add_argument("--k", type=float, default=DEFAULT_K)
     ap.add_argument("--home-adv", type=float, default=HOME_ADVANTAGE)
     ap.add_argument("--season-blend", type=float, default=SEASON_BLEND)
@@ -274,7 +242,6 @@ def main():
     )
     out_df.to_csv(Path(args.output), index=False)
     print(f"Wrote {len(out_df)} rows to {args.output}")
-
 
 if __name__ == "__main__":
     main()
