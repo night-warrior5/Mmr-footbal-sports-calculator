@@ -1,27 +1,364 @@
 
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+:root {
+  --bg-light: #f2f2f5;
+  --bg-dark: #1e1e1e;
+  --bg-panel-light: #ffffff;
+  --bg-panel-dark: #262626;
+  --text-light: #0f172a;
+  --text-dark: #e5e7eb;
+  --accent: #0077dd;
+  --accent-hover: #005fa8;
+  --border-subtle: #d4d4d8;
+  --border-dark: #444;
+  --shadow-soft: 0 10px 25px rgba(15, 23, 42, 0.12);
+  --radius-lg: 12px;
+  --transition-fast: 0.25s ease;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
+    sans-serif;
+}
+
 body {
-  font-family: Arial, sans-serif;
-  margin: 30px;
-  background: #f9f9f9;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  background: var(--bg-light);
+  color: var(--text-light);
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 
-h1 {
-  margin-bottom: 20px;
+
+body.light {
+  background: var(--bg-light);
+  color: var(--text-light);
 }
 
-.controls {
-  margin-bottom: 20px;
+body.dark {
+  background: var(--bg-dark);
+  color: var(--text-dark);
 }
 
-#teamSelect {
-  margin-left: 10px;
-  padding: 5px;
+
+
+.app-header {
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: inherit;
+  backdrop-filter: blur(6px);
 }
 
-#chart {
-  width: 100%;
-  height: 600px;
-  background: white;
-  border: 1px solid #ddd;
+.title-block h1 {
+  margin: 0;
+  font-size: 1.7rem;
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.file-info {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) 1fr;
+  gap: 20px;
+  padding: 10px 20px 20px;
+}
+
+.panel {
+  background: var(--bg-panel-light);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-soft);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+body.dark .panel {
+  background: var(--bg-panel-dark);
+  border-color: var(--border-dark);
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label-strong {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.help-text {
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+.team-select-container {
+  border-radius: 8px;
   padding: 10px;
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+}
+
+body.dark .team-select-container {
+  border-color: var(--border-dark);
+}
+
+#teamSearch {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  font-size: 0.9rem;
+}
+
+body.dark #teamSearch {
+  border-color: var(--border-dark);
+  background: #18181b;
+  color: var(--text-dark);
+}
+
+#teamList {
+  max-height: 180px;
+  overflow-y: auto;
+  margin-top: 6px;
+}
+
+#teamList div {
+  padding: 4px 6px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+#teamList div:hover {
+  background: #5a5a5a33;
+}
+
+#selectedTeams {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.team-chip {
+  padding: 4px 10px;
+  background: var(--accent);
+  color: white;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.team-chip:hover {
+  background: var(--accent-hover);
+}
+
+
+.btn-primary,
+.btn-secondary {
+  border-radius: 999px;
+  padding: 8px 14px;
+  border: none;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background var(--transition-fast),
+    transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.25);
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: inherit;
+  border: 1px solid var(--border-subtle);
+}
+
+body.dark .btn-secondary {
+  border-color: var(--border-dark);
+}
+
+.btn-secondary:hover {
+  background: #5a5a5a33;
+}
+
+.checkbox-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 24px;
+}
+
+.switch input {
+  display: none;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  background-color: #ccc;
+  border-radius: 24px;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  transition: 0.4s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: 0.4s;
+}
+
+input:checked + .slider {
+  background: var(--accent);
+}
+
+input:checked + .slider:before {
+  transform: translateX(26px);
+}
+
+
+.chart-container {
+  height: 650px;
+  background: white;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  padding: 6px;
+}
+
+body.dark .chart-container {
+  background: #111827;
+  border-color: var(--border-dark);
+}
+
+
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  margin-top: 4px;
+  font-size: 0.85rem;
+}
+
+th,
+td {
+  border: 1px solid var(--border-subtle);
+  padding: 6px 8px;
+  text-align: center;
+}
+
+th {
+  background: #f9fafb;
+  font-weight: 600;
+}
+
+body.dark table {
+  background: #111827;
+  color: var(--text-dark);
+}
+
+body.dark th {
+  background: #1f2933;
+}
+
+body.dark th,
+body.dark td {
+  border-color: var(--border-dark);
+}
+
+
+.status-message {
+  font-size: 0.8rem;
+  min-height: 1.2em;
+  opacity: 0.9;
+}
+
+.app-footer {
+  padding: 10px 20px 20px;
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-container {
+    height: 500px;
+  }
+}
+
+@media (max-width: 600px) {
+  .app-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
